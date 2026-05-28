@@ -39,10 +39,69 @@ tests/functional/
 6. Do not delete existing tests.
 7. Do not skip tests to force a pass.
 8. Do not weaken assertions.
-9. Do not automate destructive actions.
-10. Reuse the existing authenticated storage state when appropriate.
-11. Use semantic locators whenever possible.
-12. If stable selectors are missing, document the gap instead of creating brittle tests.
+9. Do not automate destructive UI actions on real production data. Document destructive flows as manual test candidates.
+10. API-based test data setup and teardown is allowed and encouraged. Use Playwright's `request` fixture to create resources before tests and delete them after.
+11. Reuse the existing authenticated storage state when appropriate.
+12. Use semantic locators whenever possible.
+13. If stable selectors are missing, document the gap instead of creating brittle tests.
+14. If you cannot determine how to set up test data, ask the user which resources can be created and deleted for testing.
+
+## Test data management
+
+Functional tests often need data that does not already exist in the system. Use API requests to set up and tear down test data.
+
+### Discovering the API
+
+Before generating test data fixtures, discover how to create and delete resources:
+
+1. If the `SWAGGER_URL` environment variable is set, read the OpenAPI/Swagger spec from that URL to find available endpoints, request schemas, and response shapes.
+2. If `SWAGGER_URL` is not set, check the project for local API documentation files:
+   - `openapi.yaml` or `openapi.json` in the project root or `docs/` directory
+   - `swagger.yaml` or `swagger.json` in the project root or `docs/` directory
+3. If no API documentation is found, ask the user:
+   - Which resources can be safely created and deleted for testing?
+   - What are the API endpoint paths and payload shapes for those resources?
+   - Are there any restrictions on which environments or data can be used?
+
+### Seeding and cleaning up test data
+
+Use Playwright's `request` fixture in `test.beforeEach` and `test.afterAll` to create and delete test resources via the API.
+
+Example pattern:
+
+```ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Team management', () => {
+  let teamId: string;
+
+  test.beforeEach(async ({ request }) => {
+    const response = await request.post('/api/teams', {
+      data: { name: 'Test Team', description: 'Created by QA' },
+    });
+    const body = await response.json();
+    teamId = body.id;
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (teamId) {
+      await request.delete(`/api/teams/${teamId}`);
+    }
+  });
+
+  test('team appears in the list after creation', async ({ page }) => {
+    await page.goto('/admin/teams');
+    await expect(page.getByText('Test Team')).toBeVisible();
+  });
+});
+```
+
+### Rules for test data
+
+- Always clean up created resources in `test.afterAll` or `test.afterEach`.
+- Use unique names or identifiers to avoid collisions with real data.
+- If cleanup fails, document it in the report.
+- Never create test data through the UI when an API is available.
 
 ## Suggested files
 

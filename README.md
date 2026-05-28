@@ -87,6 +87,7 @@ opencode-qa-toolkit/
         auth.ts
         navigation.ts
         forms.ts
+        api.ts
 
   docs/
     workflow.md
@@ -196,6 +197,12 @@ Create a `.env` file in the target project root:
 TEST_ENV_URL=https://hub.sentinel.la
 TEST_USER=<USER>
 TEST_PASSWORD=<PASSWORD>
+```
+
+Optionally, add `SWAGGER_URL` so the functional-test agent can discover API endpoints:
+
+```bash
+SWAGGER_URL=https://hub.sentinel.la/api/docs
 ```
 
 If role-based tests are needed, add additional variables as needed:
@@ -928,9 +935,9 @@ await expect(page.getByTestId('invite-member-form')).toBeVisible();
 
 ## Safety rules
 
-The QA tools must not execute destructive actions automatically.
+The QA tools must not automate destructive UI actions on real production data.
 
-Do not automate:
+Do not automate through the UI:
 
 ```text
 - Delete user
@@ -944,6 +951,8 @@ Do not automate:
 
 If such flows exist, document them as manual test candidates.
 
+API-based test data setup and teardown is allowed and encouraged. Use Playwright's `request` fixture to create resources before tests and delete them after. See [Test data management](#test-data-management) below.
+
 ## `.env` and `.gitignore` setup
 
 Create a `.env` file in the target project root with the required variables:
@@ -955,6 +964,57 @@ TEST_PASSWORD=<PASSWORD>
 ```
 
 Add QA reports and Playwright artifacts to `.gitignore`. A ready-made template is available at `examples/playwright/gitignore.example` or can be appended automatically by `scripts/install.sh`.
+
+## Test data management
+
+Functional tests often need data that does not already exist in the system. Instead of creating data through the UI (which would be destructive), use Playwright's `request` fixture to create and delete resources via the API.
+
+### Pattern: seed via API, test via UI, clean up via API
+
+```ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Team management', () => {
+  let teamId: string;
+
+  test.beforeEach(async ({ request }) => {
+    const response = await request.post('/api/teams', {
+      data: { name: 'Test Team', description: 'Created by QA' },
+    });
+    const body = await response.json();
+    teamId = body.id;
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (teamId) {
+      await request.delete(`/api/teams/${teamId}`);
+    }
+  });
+
+  test('team appears in the list after creation', async ({ page }) => {
+    await page.goto('/admin/teams');
+    await expect(page.getByText('Test Team')).toBeVisible();
+  });
+});
+```
+
+### Discovering the API
+
+The functional-test agent discovers how to create and delete resources by checking:
+
+1. **`SWAGGER_URL` environment variable** — if set, reads the OpenAPI/Swagger spec from that URL.
+2. **Local API documentation files** — checks for `openapi.yaml`, `openapi.json`, `swagger.yaml`, or `swagger.json` in the project root or `docs/` directory.
+3. **Asks the user** — if no API documentation is available, asks which resources can be created and deleted for testing, and what endpoints and payloads to use.
+
+### When to ask the user
+
+The agent should ask the user when:
+
+- No API documentation is available (no `SWAGGER_URL` and no local spec files).
+- It cannot determine which resources are safe to create and delete.
+- It needs clarification on endpoint paths or payload shapes.
+
+Generic API helpers are available in `examples/playwright/helpers/api.ts`.
 
 ## Failure classification
 

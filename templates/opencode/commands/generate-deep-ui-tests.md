@@ -34,9 +34,9 @@ Create deeper tests for:
    - `getByPlaceholder`
    - `getByTestId`
 6. Avoid brittle CSS selectors unless no semantic selector exists.
-7. Do **not** automate destructive actions (delete, remove, approve, reject, irreversible save). Document them as manual test candidates instead.
+7. Do **not** automate destructive UI actions on real production data (delete, remove, approve, reject, irreversible save). Document them as manual test candidates instead. API-based test data setup and teardown via `request` is allowed and encouraged.
 8. Reuse the existing authenticated session if Playwright is configured for it.
-9. If a test depends on test data that does not exist, skip the test and document the dependency.
+9. If a test depends on test data that does not exist, check for Swagger/OpenAPI documentation first (see Test data management below). If no API docs are available, skip the test and document the dependency, or ask the user how to set up test data.
 10. Keep tests focused and readable — one behavior per test when practical.
 11. Do **not** duplicate tests that already exist in the suite.
 
@@ -54,6 +54,20 @@ tests/empty-and-loading-states.spec.ts
 ```
 
 Only create files that make sense for the application.
+
+## Test data management
+
+If tests need data that does not already exist in the system, use the API to set it up.
+
+### Discovering the API
+
+1. If the `SWAGGER_URL` environment variable is set, read the OpenAPI/Swagger spec from that URL.
+2. If not set, check for local files: `openapi.yaml`, `openapi.json`, `swagger.yaml`, `swagger.json` in the project root or `docs/` directory.
+3. If no API documentation is found, ask the user which resources can be created and deleted for testing.
+
+### Pattern
+
+Use `test.beforeEach` to create test data via `request` and `test.afterAll` to delete it. Keep UI assertions focused on verifying behavior.
 
 ## Execution
 

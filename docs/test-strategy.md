@@ -136,7 +136,7 @@ await expect(page.getByTestId('invite-member-form')).toBeVisible();
 
 ## Safety rules
 
-Never automate destructive actions:
+Never automate destructive UI actions on real production data:
 
 - Delete user
 - Remove cluster
@@ -147,6 +147,8 @@ Never automate destructive actions:
 - Submit irreversible workflow
 
 Instead, document these flows as manual test candidates.
+
+API-based test data setup and teardown is allowed and encouraged. Use Playwright's `request` fixture to create resources before tests and delete them after. See [Test data management](#test-data-management) below.
 
 ## Authentication setup
 
@@ -165,6 +167,59 @@ Role-based testing (optional — add as needed):
 
 - `TEST_ADMIN_USER` / `TEST_ADMIN_PASSWORD` — admin user credentials.
 - `TEST_VIEWER_USER` / `TEST_VIEWER_PASSWORD` — viewer/restricted user credentials.
+
+Optional:
+
+- `SWAGGER_URL` — URL pointing to an OpenAPI/Swagger JSON/YAML spec. If set, agents will read it to discover API endpoints for test data management.
+
+## Test data management
+
+Functional tests often need data that does not already exist in the system. Instead of creating data through the UI (which would be destructive), use the API to set up and tear down test data.
+
+### Pattern: seed via API, test via UI, clean up via API
+
+```ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Team management', () => {
+  let teamId: string;
+
+  test.beforeEach(async ({ request }) => {
+    const response = await request.post('/api/teams', {
+      data: { name: 'Test Team', description: 'Created by QA' },
+    });
+    const body = await response.json();
+    teamId = body.id;
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (teamId) {
+      await request.delete(`/api/teams/${teamId}`);
+    }
+  });
+
+  test('team appears in the list after creation', async ({ page }) => {
+    await page.goto('/admin/teams');
+    await expect(page.getByText('Test Team')).toBeVisible();
+  });
+});
+```
+
+### Discovering the API
+
+Agents discover how to create and delete resources by checking:
+
+1. **`SWAGGER_URL` environment variable** — if set, reads the OpenAPI/Swagger spec to find endpoints, request schemas, and response shapes.
+2. **Local API documentation files** — checks for `openapi.yaml`, `openapi.json`, `swagger.yaml`, or `swagger.json` in the project root or `docs/` directory.
+3. **Asks the user** — if no API documentation is available, asks which resources can be created and deleted, and what endpoints and payloads to use.
+
+### Rules
+
+- Always clean up created resources in `test.afterAll` or `test.afterEach`.
+- Use unique names or identifiers to avoid collisions with real data.
+- Never create test data through the UI when an API is available.
+- If cleanup fails, document it in the report.
+- Generic API helpers are available in `examples/playwright/helpers/api.ts`.
 
 ## Failure handling
 
