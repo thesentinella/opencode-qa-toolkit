@@ -1234,7 +1234,74 @@ Run QA again:
 /qa
 ```
 
-## Suggested command files
+## Working with agents
+
+Most commands run automatically after you type the slash command. Some commands will ask you questions before proceeding. This is expected — the agent needs information about your application that it cannot discover on its own.
+
+### When agents ask questions
+
+#### `/functional-test` and `/generate-deep-ui-tests`
+
+These commands may ask you about test data and API endpoints. Typical questions:
+
+**"Which resources can I create and delete for testing?"**
+
+The agent needs to know which API endpoints it can use to set up and tear down test data. Answer with the resource name, API path, and any required fields.
+
+Example answer:
+
+```text
+You can create and delete teams via POST /api/teams and DELETE /api/teams/:id.
+Required fields: { name: string, description?: string }
+The response returns { id, name, description, createdAt }.
+```
+
+**"What are the API endpoint paths and payload shapes?"**
+
+If the agent cannot find your API documentation, it will ask for endpoint details. You can also avoid this question by setting the `SWAGGER_URL` environment variable or placing an `openapi.yaml` / `swagger.json` file in your project root or `docs/` directory. When the agent can read your OpenAPI spec, it will discover endpoints automatically and only ask which ones are safe to use for test data.
+
+Example answer:
+
+```text
+Swagger is available at https://hub.sentinel.la/api/docs.
+You can use POST /api/teams and DELETE /api/teams/:id for test data.
+Avoid the /api/clusters endpoints — those operate on production data.
+```
+
+**"Which areas should I prioritize for functional testing?"**
+
+The agent may ask which parts of the application need the most attention. Answer with the feature areas that matter most.
+
+Example answer:
+
+```text
+Focus on team management (invite, roles, permissions) and cluster detail pages.
+Alerts and profile are lower priority.
+```
+
+#### `/api-test`
+
+The `api-test` command may ask about which endpoints to test and which are safe to call. If `SWAGGER_URL` is set, it will read the spec first and only ask about endpoints it cannot find documentation for.
+
+Example answer:
+
+```text
+Test GET /api/teams, GET /api/teams/:id, POST /api/teams, and DELETE /api/teams/:id.
+Do not test DELETE /api/users — that affects production data.
+For POST /api/teams, the minimum required payload is { name: "string" }.
+```
+
+#### `/crawl-ui`
+
+The crawl agent generally does not ask questions. It navigates the application and documents what it finds. If it cannot reach the application at `TEST_ENV_URL`, it will report a connectivity error.
+
+### Tips for smoother interaction
+
+- **Set `SWAGGER_URL`** in your `.env` file. When the agent can read your OpenAPI spec, it generates better test data fixtures and asks fewer questions.
+- **Place an OpenAPI spec locally** (`openapi.yaml`, `openapi.json`, `swagger.yaml`, or `swagger.json` in the project root or `docs/` directory) as an alternative to `SWAGGER_URL`.
+- **Be specific about destructive endpoints.** Tell the agent which endpoints are safe for test data creation and which must never be called.
+- **Review generated tests.** The agent creates tests based on what it can discover. Read the generated files before considering the coverage complete.
+- **Point the agent to existing reports.** If a crawl report (`ui-crawl-report.md`) already exists, the agent will read it. You can also tell the agent to focus on specific areas: "Focus on the team management and cluster detail pages."
 
 The toolkit should provide these files:
 
