@@ -128,16 +128,10 @@ cp -R ../opencode-qa-toolkit/templates/opencode/* .opencode/
 Or use the install script which also sets up `.gitignore` entries:
 
 ```bash
-./scripts/install.sh /path/to/target-app
+/path/to/opencode-qa-toolkit/scripts/install.sh .
 ```
 
-Then create a `.env` file in the target project:
-
-```bash
-TEST_ENV_URL=https://hub.sentinel.la
-TEST_USER=<USER>
-TEST_PASSWORD=<PASSWORD>
-```
+Then create a `.env` file with your test credentials. See the [`.env` and `.gitignore` setup](#env-and-gitignore-setup) section for details.
 
 The target app should have:
 
@@ -158,6 +152,77 @@ your-app/
       api-test.md
       a11y-test.md
       visual-regression.md
+```
+
+## Getting started
+
+### 1. Create a project directory and install Playwright
+
+```bash
+mkdir my-project && cd my-project
+npm init playwright@latest
+```
+
+Choose **TypeScript**, set test directory to **tests**, skip GitHub Actions, and install browsers.
+
+### 2. Install additional dependencies
+
+```bash
+npm install -D dotenv
+npm install -D @axe-core/playwright   # optional, for /a11y-test
+```
+
+### 3. Create a `.env` file
+
+See the [`.env` and `.gitignore` setup](#env-and-gitignore-setup) section below for required variables.
+
+### 4. Configure `playwright.config.ts`
+
+Copy the example from the [Recommended Playwright setup](#recommended-playwright-setup) section below.
+
+### 5. Create `tests/auth.setup.ts`
+
+Copy the example from the [Recommended Playwright setup](#recommended-playwright-setup) section below.
+
+### 6. Delete the generated example test
+
+```bash
+rm tests/example.spec.ts
+```
+
+### 7. Initialize and configure OpenCode
+
+```bash
+opencode
+```
+
+Run `/init` inside OpenCode, then configure permissions in `.opencode/opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": "allow",
+    "fs/*": "allow",
+    "env/*": "allow"
+  }
+}
+```
+
+### 8. Install the QA toolkit
+
+From inside the target project:
+
+```bash
+/path/to/opencode-qa-toolkit/scripts/install.sh .
+```
+
+### 9. Start crawling
+
+In OpenCode:
+
+```text
+/crawl-ui
 ```
 
 ## Optional install script
@@ -185,32 +250,15 @@ Usage from inside the target app:
 The target project should have:
 
 * Node.js.
-* Playwright.
+* Playwright (installed via `npm init playwright@latest`).
+* dotenv (installed via `npm install -D dotenv`).
+* `@axe-core/playwright` (optional, for `/a11y-test`).
 * OpenCode.
 * A working `playwright.config.ts`.
 * A reachable local or remote app URL.
 * Test credentials in a `.env` file.
 
-Create a `.env` file in the target project root:
-
-```bash
-TEST_ENV_URL=https://hub.sentinel.la
-TEST_USER=<USER>
-TEST_PASSWORD=<PASSWORD>
-```
-
-Optionally, add `SWAGGER_URL` so the functional-test agent can discover API endpoints:
-
-```bash
-SWAGGER_URL=https://hub.sentinel.la/api/docs
-```
-
-If role-based tests are needed, add additional variables as needed:
-
-```bash
-TEST_ADMIN_USER=<ADMIN_USER>
-TEST_ADMIN_PASSWORD=<ADMIN_PASSWORD>
-```
+See [Getting started](#getting-started) for the full setup walkthrough.
 
 ## Recommended Playwright setup
 
@@ -961,6 +1009,19 @@ Create a `.env` file in the target project root with the required variables:
 TEST_ENV_URL=https://hub.sentinel.la
 TEST_USER=<USER>
 TEST_PASSWORD=<PASSWORD>
+```
+
+Optionally, add `SWAGGER_URL` so the functional-test agent can discover API endpoints:
+
+```bash
+SWAGGER_URL=https://hub.sentinel.la/api/docs
+```
+
+If role-based tests are needed, add additional variables as needed:
+
+```bash
+TEST_ADMIN_USER=<ADMIN_USER>
+TEST_ADMIN_PASSWORD=<ADMIN_PASSWORD>
 ```
 
 Add QA reports and Playwright artifacts to `.gitignore`. A ready-made template is available at `examples/playwright/gitignore.example` or can be appended automatically by `scripts/install.sh`.
