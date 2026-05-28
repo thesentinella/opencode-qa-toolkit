@@ -58,23 +58,35 @@ Recommended structure:
 ```text
 opencode-qa-toolkit/
   README.md
+  AGENTS.md
 
   templates/
     opencode/
       agents/
         functional-qa.md
+        smoke-qa.md
+        crawl-qa.md
       commands/
         crawl-ui.md
         generate-ui-tests.md
         qa.md
         generate-deep-ui-tests.md
         functional-test.md
+        smoke-test.md
+        api-test.md
+        a11y-test.md
+        visual-regression.md
 
   examples/
     playwright/
       auth.setup.ts
       playwright.config.ts
       package-scripts.json
+      gitignore.example
+      helpers/
+        auth.ts
+        navigation.ts
+        forms.ts
 
   docs/
     workflow.md
@@ -112,19 +124,39 @@ mkdir -p .opencode
 cp -R ../opencode-qa-toolkit/templates/opencode/* .opencode/
 ```
 
-After installation, the target app should have:
+Or use the install script which also sets up `.gitignore` entries:
+
+```bash
+./scripts/install.sh /path/to/target-app
+```
+
+Then create a `.env` file in the target project:
+
+```bash
+TEST_ENV_URL=https://hub.sentinel.la
+TEST_USER=<USER>
+TEST_PASSWORD=<PASSWORD>
+```
+
+The target app should have:
 
 ```text
 your-app/
   .opencode/
     agents/
       functional-qa.md
+      smoke-qa.md
+      crawl-qa.md
     commands/
       crawl-ui.md
       generate-ui-tests.md
       qa.md
       generate-deep-ui-tests.md
       functional-test.md
+      smoke-test.md
+      api-test.md
+      a11y-test.md
+      visual-regression.md
 ```
 
 ## Optional install script
@@ -133,20 +165,7 @@ your-app/
 scripts/install.sh
 ```
 
-Example:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-TARGET_DIR="${1:-.}"
-
-mkdir -p "$TARGET_DIR/.opencode"
-
-cp -R templates/opencode/* "$TARGET_DIR/.opencode/"
-
-echo "Installed OpenCode QA toolkit into $TARGET_DIR/.opencode"
-```
+The script copies templates into `.opencode/` and appends Playwright-related entries to the target project's `.gitignore`.
 
 Usage from inside `opencode-qa-toolkit`:
 
@@ -169,23 +188,21 @@ The target project should have:
 * OpenCode.
 * A working `playwright.config.ts`.
 * A reachable local or remote app URL.
-* Test credentials provided through environment variables.
+* Test credentials in a `.env` file.
 
-Example:
+Create a `.env` file in the target project root:
 
 ```bash
-TEST_USER="user@example.com"
-TEST_PASSWORD="your-password"
+TEST_ENV_URL=https://hub.sentinel.la
+TEST_USER=<USER>
+TEST_PASSWORD=<PASSWORD>
 ```
 
-If role-based tests are needed:
+If role-based tests are needed, add additional variables as needed:
 
 ```bash
-TEST_ADMIN_USER="admin@example.com"
-TEST_ADMIN_PASSWORD="admin-password"
-
-TEST_VIEWER_USER="viewer@example.com"
-TEST_VIEWER_PASSWORD="viewer-password"
+TEST_ADMIN_USER=<ADMIN_USER>
+TEST_ADMIN_PASSWORD=<ADMIN_PASSWORD>
 ```
 
 ## Recommended Playwright setup
@@ -238,7 +255,7 @@ export default defineConfig({
   reporter: 'html',
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.TEST_ENV_URL || 'http://localhost:5173',
     trace: 'on-first-retry',
   },
 
@@ -374,6 +391,75 @@ Examples:
 * Filters change the visible list.
 * Restricted users cannot see privileged actions.
 
+### `/smoke-test`
+
+Runs a fast subset of critical-path tests with no repair loop. Quick pass/fail for CI.
+
+Output:
+
+```text
+smoke-test-report.md
+```
+
+Use it when:
+
+* CI pipeline needs a fast gate before merge.
+* You need a quick sanity check.
+* You want to verify a deployment without a full QA run.
+
+This command does not create tests, repair locators, or re-run. It reports results immediately.
+
+### `/api-test`
+
+Generates and runs Playwright API tests using the `request` context.
+
+Output:
+
+```text
+tests/api/*.spec.ts
+api-test-report.md
+```
+
+Use it when:
+
+* You need backend contract testing separate from UI tests.
+* You want to validate API responses, status codes, and data shapes.
+* You want faster feedback on backend changes.
+
+### `/a11y-test`
+
+Runs accessibility checks using axe-core integration with Playwright.
+
+Output:
+
+```text
+tests/a11y/*.spec.ts
+a11y-report.md
+```
+
+Use it when:
+
+* You need WCAG compliance validation.
+* You want to catch accessibility regressions.
+* Compliance or audit requirements exist.
+
+### `/visual-regression`
+
+Captures and compares screenshots to detect visual regressions.
+
+Output:
+
+```text
+tests/visual/*.spec.ts
+visual-regression-report.md
+```
+
+Use it when:
+
+* UI styling or layout changed.
+* You need to verify visual consistency across releases.
+* Design system or component library validation is needed.
+
 ## Recommended workflow
 
 For a new target project:
@@ -393,6 +479,12 @@ For daily QA:
 /qa
 ```
 
+For pre-merge CI:
+
+```text
+/smoke-test
+```
+
 When the UI changed significantly:
 
 ```text
@@ -407,6 +499,24 @@ When you want better coverage:
 /generate-deep-ui-tests
 /functional-test
 /qa
+```
+
+For backend validation:
+
+```text
+/api-test
+```
+
+For accessibility audit:
+
+```text
+/a11y-test
+```
+
+For visual validation:
+
+```text
+/visual-regression
 ```
 
 ## Command responsibilities
@@ -526,6 +636,85 @@ Should not:
 * Skip tests to force a pass.
 * Pretend partial coverage is complete.
 
+### Smoke test phase
+
+Command:
+
+```text
+/smoke-test
+```
+
+Responsibilities:
+
+* Use the `smoke-qa` agent.
+* Run tests tagged `@smoke` if they exist, otherwise run the full suite.
+* Report pass/fail immediately.
+* Write `smoke-test-report.md`.
+
+Should not:
+
+* Create new tests.
+* Repair locators.
+* Re-run failed tests.
+
+### API test phase
+
+Command:
+
+```text
+/api-test
+```
+
+Responsibilities:
+
+* Create Playwright API tests using the `request` context.
+* Validate status codes, response shapes, authentication requirements, and error formats.
+* Run API tests.
+* Write `api-test-report.md`.
+
+Should not:
+
+* Test destructive API endpoints.
+* Modify application source files.
+
+### Accessibility test phase
+
+Command:
+
+```text
+/a11y-test
+```
+
+Responsibilities:
+
+* Use axe-core to scan pages for WCAG violations.
+* Check keyboard navigation, ARIA labels, color contrast.
+* Document violations with remediation guidance.
+* Write `a11y-report.md`.
+
+Should not:
+
+* Fix accessibility issues in the application — only report them.
+
+### Visual regression phase
+
+Command:
+
+```text
+/visual-regression
+```
+
+Responsibilities:
+
+* Capture screenshots of key pages.
+* Compare against baseline screenshots.
+* Report visual differences.
+* Write `visual-regression-report.md`.
+
+Should not:
+
+* Update baselines automatically — changes must be reviewed.
+
 ## Reports generated
 
 ### `ui-crawl-report.md`
@@ -597,6 +786,70 @@ Contains:
 * Failures.
 * Manual test candidates.
 * Risks and gaps.
+
+### `smoke-test-report.md`
+
+Generated by:
+
+```text
+/smoke-test
+```
+
+Contains:
+
+* Date/time.
+* Command run.
+* Result: PASSED or FAILED.
+* Tests run.
+* Failures with error details.
+* Merge recommendation.
+
+### `api-test-report.md`
+
+Generated by:
+
+```text
+/api-test
+```
+
+Contains:
+
+* Endpoints tested.
+* Status codes and response validation results.
+* Authentication requirement verification.
+* Destructive endpoints not tested.
+* Gaps and recommendations.
+
+### `a11y-report.md`
+
+Generated by:
+
+```text
+/a11y-test
+```
+
+Contains:
+
+* Pages scanned.
+* Violations by impact level (critical, serious, moderate, minor).
+* WCAG criteria violated.
+* Remediation guidance.
+* Manual test candidates.
+
+### `visual-regression-report.md`
+
+Generated by:
+
+```text
+/visual-regression
+```
+
+Contains:
+
+* Pages captured.
+* Comparison results (matched, different, new baseline).
+* Visual differences with descriptions.
+* Update recommendations for baselines.
 
 ## Testing philosophy
 
@@ -691,6 +944,18 @@ Do not automate:
 
 If such flows exist, document them as manual test candidates.
 
+## `.env` and `.gitignore` setup
+
+Create a `.env` file in the target project root with the required variables:
+
+```bash
+TEST_ENV_URL=https://hub.sentinel.la
+TEST_USER=<USER>
+TEST_PASSWORD=<PASSWORD>
+```
+
+Add QA reports and Playwright artifacts to `.gitignore`. A ready-made template is available at `examples/playwright/gitignore.example` or can be appended automatically by `scripts/install.sh`.
+
 ## Failure classification
 
 Failures should be classified as:
@@ -756,6 +1021,8 @@ Use when:
 
 ## Recommended package scripts for target apps
 
+The `examples/playwright/package-scripts.json` file contains npm scripts that should be merged into the target project's `package.json` (it is not a standalone config file).
+
 In the target application, these scripts are useful:
 
 ```json
@@ -765,9 +1032,41 @@ In the target application, these scripts are useful:
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:functional": "playwright test tests/functional",
+    "test:e2e:api": "playwright test tests/api",
+    "test:e2e:a11y": "playwright test tests/a11y",
+    "test:e2e:visual": "playwright test tests/visual",
+    "test:e2e:smoke": "playwright test --grep @smoke",
     "test:e2e:report": "playwright show-report"
   }
 }
+```
+
+## Recommended test directory structure
+
+```text
+tests/
+  auth.setup.ts                 # Authentication setup (storage state)
+  smoke.spec.ts                 # Smoke tests (@smoke tag)
+  navigation.spec.ts            # Navigation tests
+  forms.spec.ts                 # Form validation tests
+  authenticated-flows.spec.ts   # Authenticated user flows
+  *-flows.spec.ts               # Deep UI test files
+  functional/                   # Functional test files
+    auth.functional.spec.ts
+    team.functional.spec.ts
+    clusters.functional.spec.ts
+    alerts.functional.spec.ts
+    roles.functional.spec.ts
+    profile.functional.spec.ts
+  api/                          # API test files
+    auth.api.spec.ts
+    teams.api.spec.ts
+    clusters.api.spec.ts
+    alerts.api.spec.ts
+  a11y/                         # Accessibility test files
+    pages.a11y.spec.ts
+  visual/                       # Visual regression test files
+    pages.visual.spec.ts
 ```
 
 ## Example usage
@@ -824,6 +1123,10 @@ templates/opencode/commands/generate-ui-tests.md
 templates/opencode/commands/qa.md
 templates/opencode/commands/generate-deep-ui-tests.md
 templates/opencode/commands/functional-test.md
+templates/opencode/commands/smoke-test.md
+templates/opencode/commands/api-test.md
+templates/opencode/commands/a11y-test.md
+templates/opencode/commands/visual-regression.md
 ```
 
 ## Suggested agent files
@@ -832,6 +1135,8 @@ The toolkit should provide:
 
 ```text
 templates/opencode/agents/functional-qa.md
+templates/opencode/agents/smoke-qa.md
+templates/opencode/agents/crawl-qa.md
 ```
 
 ## Versioning recommendation

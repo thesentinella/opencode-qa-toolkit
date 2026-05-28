@@ -1,0 +1,18 @@
+# Playwright QA reports
+ui-crawl-report.md
+ui-tests.md
+deep-ui-tests.md
+functional-tests.md
+smoke-test-report.md
+api-test-report.md
+a11y-report.md
+visual-regression-report.md
+
+# Playwright artifacts
+playwright/.auth/
+test-results/
+playwright-report/
+blob-report/
+
+# Environment variables
+.env

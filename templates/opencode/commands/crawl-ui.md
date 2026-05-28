@@ -1,6 +1,6 @@
 ---
 description: Crawl the Vue app UI and generate a structured Playwright testing inventory.
-agent: build
+agent: crawl-qa
 model: opencode-go/qwen3.6-plus
 ---
 

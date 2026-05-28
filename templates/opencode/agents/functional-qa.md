@@ -129,7 +129,7 @@ When present in the app, prioritize:
 
 - Roles page renders role data.
 - Permission matrix/table is visible if present.
-- Restricted actions are not visible for users without permission if test users exist.
+- If role-specific environment variables are configured (e.g. `TEST_ADMIN_USER`, `TEST_VIEWER_USER`), test that restricted actions are not visible for users without permission.
 
 ### Profile
 
